@@ -1,12 +1,10 @@
-// pages/Menu.jsx
-import MenuSection from "../components/Menusection";
-import ContactSection from "../components/Contactsection";
+import React from 'react';
 
 export default function Menu() {
   return (
-    <>
-      <MenuSection />
-      <ContactSection />
-    </>
+    <section>
+      <h2>Our Delicious Menu</h2>
+    
+    </section>
   );
 }

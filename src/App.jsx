@@ -1,26 +1,48 @@
-// App.jsx
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import Home from "./Pages/Home";
-import About from "./Pages/About";
-import Menu from "./Pages/Menu";
-import Contact from "./Pages/Contact";
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
+import Header from './components/Header.jsx'; 
+import Home from './Pages/Home.jsx';
+import Menu from './Pages/Menu.jsx';
+import About from './Pages/About.jsx';
+import Contact from './Pages/Contact.jsx';
 
 
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Header />
+const Layout = () => (
+  <>
+    <Header /> 
+    <div className="main-content-container">
+        <Outlet /> 
+    </div>
+  </>
+);
 
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/menu" element={<Menu />} />
-        <Route path="/contact" element={<Contact />} />
-      </Routes>
 
-      <Footer />
-    </BrowserRouter>
-  );
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      {
+        path: '/',
+        element: <Home />, 
+      },
+      {
+        path: '/menu',
+        element: <Menu />,
+      },
+      {
+        path: '/about',
+        element: <About />, 
+      },
+      {
+        path: '/contact',
+        element: <Contact />, 
+      },
+    ],
+  },
+]);
+
+function App() {
+  return <RouterProvider router={router} />;
 }
+
+export default App;

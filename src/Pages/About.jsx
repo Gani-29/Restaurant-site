@@ -1,7 +1,6 @@
 // pages/About.jsx
-import AboutSection from "../components/Aboutsection.jsx";
-import Testimonials from "../components/Testimonials.jsx";
-
+import AboutSection from "../components/Aboutsection";
+import Testimonials from "../components/Testimonals";
 
 export default function About() {
   return (
