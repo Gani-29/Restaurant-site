@@ -1,73 +1,42 @@
-// components/Testimonials.jsx
+import React from 'react';
 
-export default function Testimonals() {
-  const reviews = [
-    {
-      id: 1,
-      name: "Anita M.",
-      message: "The food is absolutely delicious! I loved every bite. The ingredients are so fresh, and the presentation is top-notch. Highly recommend!",
-    },
-    {
-      id: 2,
-      name: "Rahul S.",
-      message: "Great taste, fast service, and amazing ambience! The staff were incredibly friendly and accommodating. Definitely my new favorite spot.",
-    },
-    {
-      id: 3,
-      name: "Priya V.",
-      message: "Best restaurant experience I've had in a long time. The Pesto Pasta was divine, and the dessert was the perfect finish.",
-    },
-    {
-      id: 4,
-      name: "Karan B.",
-      message: "An authentic food journey! Every dish we tried was rich in flavor and perfectly cooked. Can't wait to come back for more.",
-    },
-    {
-      id: 5,
-      name: "Deepika R.",
-      message: "Excellent value for money. The portions are generous, and the quality is consistently high. A must-visit place for food lovers.",
-    },
-  ];
-
-  return (
-   
-    <section id="testimonials" className="py-16 md:py-24 bg-white text-center rounded-xl shadow-xl mx-auto max-w-6xl my-12 px-6 sm:px-10">
-      
-     
-      <h2 className="text-4xl md:text-5xl font-extrabold text-green-700 mb-12 tracking-tight">
-        What Our Customers Say
-      </h2>
-
-      <div
-        className="flex lg:grid lg:grid-cols-3 gap-6 max-w-5xl mx-auto overflow-x-auto pb-4 lg:overflow-visible lg:pb-0 justify-start lg:justify-center"
-      >
-        {reviews.map((review) => (
-         
-          <div
-            key={review.id}
-            className="min-w-[300px] lg:min-w-0 bg-white p-6 border border-gray-200 rounded-xl shadow-md shrink-0 lg:shrink"
-          >
-           
-            <svg 
-                className="w-8 h-8 text-green-500 mb-3 mx-auto" 
-                fill="currentColor" 
-                viewBox="0 0 24 24"
-            >
-                <path d="M13.75 3a.75.75 0 01.75.75v5.5a.75.75 0 01-1.5 0V5.04l-2.07 2.07a.75.75 0 01-1.06-1.06L12.5 3.94A.75.75 0 0113 3h.75zM10.25 15a.75.75 0 01.75.75v5.5a.75.75 0 01-1.5 0v-5.5a.75.75 0 01.75-.75zM13 14.75a.75.75 0 01.75.75v5.5a.75.75 0 01-1.5 0v-5.5a.75.75 0 01.75-.75z" />
-            </svg>
+const Testimonials = () => (
+    <section id="testimonial-section" className="py-20 lg:py-32 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+            <p className="text-lg uppercase tracking-widest text-accent-gold mb-3 font-semibold">Testimonial</p>
+            <h2 className="text-4xl sm:text-5xl font-serif font-bold text-light-creme">What Our Customers Say</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Testimonial 1 */}
+            <div className="bg-card-dark/70 p-8 rounded-xl shadow-xl border border-light-creme/10">
+                <p className="text-light-creme/90 italic mb-6 leading-relaxed">
+                    "The dining experience at Gani's Resto was exceptional. From the moment we walked in, the service was impeccable, and the Prime Aged Ribeye was hands down the best I've ever tasted. Highly recommend for any special occasion."
+                </p>
+                <div className="flex items-center">
+                    <img src="https://as1.ftcdn.net/v2/jpg/03/45/60/48/1000_F_345604895_jxCVsxv911L4Mxg7tocPDhYvQaSYPi0z.jpg" alt="Customer Jane Doe" className="w-12 h-12 rounded-full object-cover mr-4 border-2 border-accent-gold" />
+                    <div>
+                        <p className="font-semibold text-accent-gold">Jane Doe</p>
+                        <p className="text-sm text-light-creme/60">Food Enthusiast</p>
+                    </div>
+                </div>
+            </div>
             
-
-            <p className="text-gray-700 italic text-base mb-4 leading-relaxed">
-              "{review.message}"
-            </p>
-            
-            
-            <h4 className="text-lg font-semibold text-green-600 text-right mt-3">
-              - {review.name}
-            </h4>
-          </div>
-        ))}
-      </div>
+            {/* Testimonial 2 */}
+            <div className="bg-card-dark/70 p-8 rounded-xl shadow-xl border border-light-creme/10">
+                <p className="text-light-creme/90 italic mb-6 leading-relaxed">
+                    "A true culinary journey! The Velvet Beetroot Soup was an unexpected delight, and the atmosphere is wonderfully elegant yet welcoming. We booked a table for four and everything was perfect. We will definitely be back."
+                </p>
+                <div className="flex items-center">
+                    <img src="https://as1.ftcdn.net/v2/jpg/03/45/60/48/1000_F_345604895_jxCVsxv911L4Mxg7tocPDhYvQaSYPi0z.jpg" alt="Customer Mark King" className="w-12 h-12 rounded-full object-cover mr-4 border-2 border-accent-gold" />
+                    <div>
+                        <p className="font-semibold text-accent-gold">Mark King</p>
+                        <p className="text-sm text-light-creme/60">Local Critic</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
-  );
-}
+);
+
+export default Testimonials;
