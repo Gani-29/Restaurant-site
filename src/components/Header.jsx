@@ -39,7 +39,7 @@ const Header = ({ setPage, cartItemsCount, isMenuOpen, toggleMenu }) => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-20">
                     <a href="#" onClick={(e) => handleNavigation('home', e)} className="flex-shrink-0 text-3xl font-serif font-bold text-accent-gold tracking-wider">
-                        Culinary Haven
+                        Gani's Resto
                     </a>
                     <div className="hidden md:flex space-x-8 items-center">
                         <NavLink href="#" onClick={(e) => handleNavigation('home', e)}>Home</NavLink>
