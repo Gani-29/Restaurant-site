@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, doc, query, updateDoc, deleteDoc } from 'firebase/firestore';
+import { supabase, getLocalUserId, fetchCartItems } from './supabase_config'; 
 
 // Import Components and Pages
 import Header from './components/Header.jsx';
@@ -9,14 +7,17 @@ import Footer from './components/Footer.jsx';
 import Home from './Pages/Home.jsx'; 
 import Cart from './Pages/Cart.jsx'; 
 
-const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+// --- Configuration ---
+// These former Firebase globals are no longer needed but are kept outside React components for context.
+const firebaseConfig = {};
+const appId = 'default-app-id';
+const initialAuthToken = null; 
 
 const tailwindConfig = {
-    fontFamily: { sans: ['Inter', 'sans-serif'], },
-    colors: { 'primary-dark': '#1C1C1C', 'accent-gold': '#B8860B', 'light-creme': '#EAE7DC', 'highlight-red': '#A52A2A', 'cta-bright': '#F44336', },
+    fontFamily: { sans: ['Inter', 'sans-serif'], },
+    colors: { 'primary-dark': '#1C1C1C', 'accent-gold': '#B8860B', 'light-creme': '#EAE7DC', 'highlight-red': '#A52A2A', 'cta-bright': '#F44336', 'card-dark': '#2E2E2E' },
 };
+
 
 const App = () => {
     // --- State Management ---
@@ -25,96 +26,115 @@ const App = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState(null);
     const [cartItems, setCartItems] = useState([]); 
-    const [db, setDb] = useState(null);
     const [userId, setUserId] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
 
+    // --- Supabase Initialization and Auth/User Setup ---
     useEffect(() => {
-        if (Object.keys(firebaseConfig).length === 0) {
-            setUserId('Anon-Local');
+        if (!supabase) {
+            setUserId('Init-Failed'); 
             setIsAuthReady(true);
             return;
         }
+
+        // --- Supabase Auth Listener ---
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session?.user) {
+                // User logged in via Supabase Auth
+                setUserId(session.user.id);
+            } else {
+                // Anonymous persistence using a local UUID
+                setUserId(getLocalUserId());
+            }
+            setIsAuthReady(true);
+        });
+
+        // Immediately set local user ID while Supabase checks for session
+        setUserId(getLocalUserId());
         
-        const initializeFirebase = async () => {
-            try {
-                const app = initializeApp(firebaseConfig);
-                const firestore = getFirestore(app);
-                setDb(firestore); 
-                const authInstance = getAuth(app); 
-
-                try {
-                    if (initialAuthToken) {
-                        await signInWithCustomToken(authInstance, initialAuthToken);
-                        console.log("Firebase: Signed in with Custom Token.");
-                    } else {
-                        await signInAnonymously(authInstance);
-                        console.log("Firebase: Signed in Anonymously (No token provided).");
-                    }
-                } catch (authError) {
-                   
-                    console.error("Firebase Auth Failed (Token Issue/Expired). Falling back to Anonymous sign-in.", authError);
-                    await signInAnonymously(authInstance); 
-                }
-
-               
-                const unsubscribe = onAuthStateChanged(authInstance, (user) => {
-                    if (user) {
-                        setUserId(user.uid);
-                    } else {
-                        setUserId('Auth-Failed'); 
-                    }
-                    setIsAuthReady(true);
-                });
-
-                return unsubscribe;
-            } catch (error) { 
-                console.error("Fatal Firebase Initialization Failed:", error);
-                setUserId('Init-Failed'); 
-                setIsAuthReady(true); 
-                return () => {}; 
+        return () => {
+             // Cleanup Supabase Auth subscription
+            if (subscription && subscription.unsubscribe) {
+                subscription.unsubscribe();
             }
         };
 
-        const cleanup = initializeFirebase();
-        return () => { cleanup.then(f => f && f()); }; 
     }, []);
 
-    // --- Real-time Cart Listener ---
+    // --- Real-time Cart Listener (Supabase Realtime) ---
     useEffect(() => {
-        let unsubscribeCart = () => {};
-     
-        if (isAuthReady && db && userId && userId !== 'Auth-Failed' && userId !== 'Init-Failed') {
-            try {
-                const cartRef = collection(db, `artifacts/${appId}/users/${userId}/cartItems`);
-                const q = query(cartRef);
-                unsubscribeCart = onSnapshot(q, (snapshot) => {
-                    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), }));
-                    setCartItems(items);
-                }, (error) => {
-                    console.error("Cart Listener Error:", error);
-                    setCartItems([]);
-                });
-            } catch (error) { /* Error listening to cart */ }
-        } else if (userId === 'Auth-Failed' || userId === 'Init-Failed') {
-            setCartItems([]);
-        }
-        return () => unsubscribeCart();
-    }, [isAuthReady, db, userId]);
+        let subscription = { unsubscribe: () => {} };
 
-    // --- Cart CRUD Handlers ---
+        if (isAuthReady && supabase && userId && userId !== 'Init-Failed') {
+            try {
+                // Subscribe to changes in the cart_items table filtered by the current user_id
+                const channel = supabase.channel(`cart_changes_${userId}`);
+
+                channel
+                    .on(
+                        'postgres_changes',
+                        { event: '*', schema: 'public', table: 'cart_items', filter: `user_id=eq.${userId}` },
+                        () => {
+                            // On any insert, update, or delete matching the user_id, refetch the data
+                            fetchCartItems(userId, setCartItems); 
+                        }
+                    )
+                    .subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            fetchCartItems(userId, setCartItems); 
+                        }
+                    });
+
+                // Set cleanup function
+                subscription.unsubscribe = () => supabase.removeChannel(channel);
+
+            } catch (error) {
+                console.error("Error setting up Supabase cart listener:", error);
+                setCartItems([]);
+            }
+        }
+
+        return () => subscription.unsubscribe();
+    }, [isAuthReady, userId]); 
+
+
+    // --- Cart CRUD Handlers (Migrated to Supabase) ---
     const handleAddToCart = async (dish) => {
-       
-        if (!isAuthReady || !db || !userId || userId === 'Auth-Failed') { setSuccessMessage({ error: true, message: `Cannot add to cart. Authentication required or failed. Current User ID Status: ${userId}` }); return; }
+        // Check for client readiness before any DB operation
+        if (!isAuthReady || !supabase || !userId || userId === 'Init-Failed') { 
+            setSuccessMessage({ error: true, message: `Cannot add to cart. Supabase client not ready. Current User ID Status: ${userId}` }); 
+            return; 
+        }
         setIsLoading(true);
+        
         const existingCartItem = cartItems.find(item => item.dishId === dish.id);
+        const now = new Date().toISOString(); 
+
         try {
             if (existingCartItem) {
-                const itemDocRef = doc(db, `artifacts/${appId}/users/${userId}/cartItems`, existingCartItem.id);
-                await updateDoc(itemDocRef, { quantity: existingCartItem.quantity + 1, updatedAt: serverTimestamp() });
+                // Update quantity (Supabase .update() call)
+                const { error } = await supabase
+                    .from('cart_items')
+                    .update({ quantity: existingCartItem.quantity + 1, updated_at: now })
+                    .eq('id', existingCartItem.id);
+
+                if (error) throw error;
             } else {
-                const cartRef = collection(db, `artifacts/${appId}/users/${userId}/cartItems`);
-                await addDoc(cartRef, { dishId: dish.id, name: dish.name, price: dish.currentPrice, quantity: 1, oldPrice: dish.oldPrice, discount: dish.discount, addedAt: serverTimestamp() });
+                // Insert new item (Supabase .insert() call)
+                const { error } = await supabase
+                    .from('cart_items')
+                    .insert({
+                        user_id: userId, 
+                        dish_id: dish.id, 
+                        name: dish.name,
+                        price: dish.currentPrice,
+                        quantity: 1,
+                        old_price: dish.oldPrice,
+                        discount: dish.discount,
+                        added_at: now 
+                    });
+
+                if (error) throw error;
             }
             setSuccessMessage({ error: false, message: `${dish.name} added to cart!` });
         } catch (error) { 
@@ -122,35 +142,79 @@ const App = () => {
             setSuccessMessage({ error: true, message: `Failed to modify cart: ${error.message}. Check console for details.` }); 
         } finally { setIsLoading(false); }
     };
+
     const handleUpdateQuantity = async (itemId, newQuantity) => {
-        if (!isAuthReady || !db || !userId || userId === 'Auth-Failed') return;
-        if (newQuantity <= 0) { await handleRemoveFromCart(itemId); return; }
+        if (!isAuthReady || !supabase || !userId) return;
+        const now = new Date().toISOString();
+
+        if (newQuantity <= 0) {
+            await handleRemoveFromCart(itemId);
+            return;
+        }
+
         try {
-            const itemDocRef = doc(db, `artifacts/${appId}/users/${userId}/cartItems`, itemId);
-            await updateDoc(itemDocRef, { quantity: newQuantity, updatedAt: serverTimestamp() });
-        } catch (error) { setSuccessMessage({ error: true, message: `Failed to update quantity: ${error.message}` }); }
+            const { error } = await supabase
+                .from('cart_items')
+                .update({ quantity: newQuantity, updated_at: now })
+                .eq('id', itemId); 
+
+            if (error) throw error;
+        } catch (error) {
+            console.error("Failed to update quantity:", error);
+            setSuccessMessage({ error: true, message: `Failed to update quantity: ${error.message}` });
+        }
     };
+
     const handleRemoveFromCart = async (itemId) => {
-        if (!isAuthReady || !db || !userId || userId === 'Auth-Failed') return;
+        if (!isAuthReady || !supabase || !userId) return;
+
         try {
-            const itemDocRef = doc(db, `artifacts/${appId}/users/${userId}/cartItems`, itemId);
-            await deleteDoc(itemDocRef);
-        } catch (error) { setSuccessMessage({ error: true, message: `Failed to remove item: ${error.message}` }); }
+            const { error } = await supabase
+                .from('cart_items')
+                .delete()
+                .eq('id', itemId); 
+
+            if (error) throw error;
+        } catch (error) {
+            console.error("Failed to remove item:", error);
+            setSuccessMessage({ error: true, message: `Failed to remove item: ${error.message}` });
+        }
     };
     
-    // --- Reservation Handler ---
+    // --- Reservation Handler (Migrated to Supabase) ---
     const handleReservationSubmit = async (e) => {
         e.preventDefault();
-        if (!isAuthReady || !db || !userId || userId === 'Auth-Failed' || userId === 'Init-Failed') { setSuccessMessage({ error: true, message: `Authentication or system setup failed. Current User ID Status: ${userId}` }); return; }
+        if (!isAuthReady || !supabase || !userId || userId === 'Init-Failed') { 
+            setSuccessMessage({ error: true, message: `Setup required or failed. Current User ID Status: ${userId}` }); 
+            return; 
+        }
         setIsLoading(true);
         const formData = new FormData(e.target);
-        const reservationData = { name: formData.get('name'), mobile: formData.get('mobile'), date: formData.get('date'), time: formData.get('time'), guests: parseInt(formData.get('guests')), reservedBy: userId, timestamp: serverTimestamp() };
+        const now = new Date().toISOString();
+
+        const reservationData = { 
+            reservedBy: userId, 
+            name: formData.get('name'), 
+            mobile: formData.get('mobile'), 
+            date: formData.get('date'), 
+            time: formData.get('time'), 
+            guests: parseInt(formData.get('guests')), 
+            timestamp: now 
+        };
+
         try {
-            const reservationsRef = collection(db, `artifacts/${appId}/public/data/reservations`);
-            await addDoc(reservationsRef, reservationData);
-            setSuccessMessage({ error: false, message: `Thank you, ${reservationData.name}! Your reservation for ${reservationData.guests} guests has been successfully placed in the database.` });
+            const { error } = await supabase
+                .from('reservations') // Public table
+                .insert(reservationData);
+
+            if (error) throw error;
+
+            setSuccessMessage({ error: false, message: `Thank you, ${reservationData.name}! Your reservation has been successfully placed.` });
             e.target.reset();
-        } catch (error) { setSuccessMessage({ error: true, message: `Could not save your reservation. Details: ${error.message}` }); } finally { setIsLoading(false); }
+        } catch (error) { 
+            console.error("Failed to submit reservation:", error);
+            setSuccessMessage({ error: true, message: `Could not save your reservation. Details: ${error.message}` }); 
+        } finally { setIsLoading(false); }
     };
 
     // --- Other Handlers ---
@@ -175,7 +239,7 @@ const App = () => {
                 toggleMenu={toggleMenu}
             />
 
-    
+            {/* Render the Home Page or the Cart Page */}
             {page === 'home' ? (
                 <Home 
                     handleAddToCart={handleAddToCart} 
@@ -196,21 +260,17 @@ const App = () => {
                 userId={userId} 
             />
 
+            {/* Success Message Modal (Global UI feedback) */}
             {successMessage && (
                 <div className="fixed inset-0 bg-primary-dark bg-opacity-90 z-[110] flex items-center justify-center p-4" aria-modal="true" role="alert">
-                  
                     <div className={`bg-primary-dark border ${successMessage.error ? 'border-highlight-red' : 'border-accent-gold'} rounded-xl shadow-2xl max-w-sm w-full p-8 text-center transition-all duration-300 transform scale-100 opacity-100 text-light-creme`}>
                         
-                      
                         <svg className={`w-16 h-16 mx-auto ${successMessage.error ? 'text-highlight-red' : 'text-accent-gold'} mb-4`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={successMessage.error ? "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" : "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"}></path></svg>
-                        
                         
                         <h3 className={`text-2xl font-serif font-bold mb-3 ${successMessage.error ? 'text-highlight-red' : 'text-accent-gold'}`}>{successMessage.error ? 'Action Failed' : 'Success!'}</h3>
                         
-                        
                         <p className={`mb-6 ${successMessage.error ? 'text-highlight-red' : 'text-light-creme'}`}>{successMessage.message}</p>
                         
-                        {/* Button */}
                         <button onClick={closeSuccessModal} className="bg-accent-gold text-primary-dark px-6 py-2 rounded-full font-semibold hover:bg-highlight-red hover:text-light-creme transition duration-300">Close</button>
                     </div>
                 </div>
