@@ -7,8 +7,6 @@ import Footer from './components/Footer.jsx';
 import Home from './Pages/Home.jsx'; 
 import Cart from './Pages/Cart.jsx'; 
 
-// --- Configuration ---
-// These former Firebase globals are no longer needed but are kept outside React components for context.
 const firebaseConfig = {};
 const appId = 'default-app-id';
 const initialAuthToken = null; 
@@ -98,7 +96,7 @@ const App = () => {
     }, [isAuthReady, userId]); 
 
 
-    // --- Cart CRUD Handlers (Migrated to Supabase) ---
+    // --- Cart CRUD Handlers 
     const handleAddToCart = async (dish) => {
         // Check for client readiness before any DB operation
         if (!isAuthReady || !supabase || !userId || userId === 'Init-Failed') { 
@@ -181,7 +179,7 @@ const App = () => {
         }
     };
     
-    // --- Reservation Handler (Migrated to Supabase) ---
+    // --- Reservation Handler 
     const handleReservationSubmit = async (e) => {
         e.preventDefault();
         if (!isAuthReady || !supabase || !userId || userId === 'Init-Failed') { 
@@ -204,7 +202,7 @@ const App = () => {
 
         try {
             const { error } = await supabase
-                .from('reservations') // Public table
+                .from('reservations') 
                 .insert(reservationData);
 
             if (error) throw error;
