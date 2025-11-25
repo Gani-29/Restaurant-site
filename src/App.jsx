@@ -6,15 +6,13 @@ import Header from './components/Header.jsx';
 import Footer from './components/Footer.jsx';
 import Home from './Pages/Home.jsx'; 
 import Cart from './Pages/Cart.jsx'; 
-
-const firebaseConfig = {};
-const appId = 'default-app-id';
-const initialAuthToken = null; 
+import { Login } from './Pages/Login.jsx'; 
 
 const tailwindConfig = {
-    fontFamily: { sans: ['Inter', 'sans-serif'], },
-    colors: { 'primary-dark': '#1C1C1C', 'accent-gold': '#B8860B', 'light-creme': '#EAE7DC', 'highlight-red': '#A52A2A', 'cta-bright': '#F44336', 'card-dark': '#2E2E2E' },
+    fontFamily: { sans: ['Inter', 'sans-serif'], },
+    colors: { 'primary-dark': '#1C1C1C', 'accent-gold': '#B8860B', 'light-creme': '#EAE7DC', 'highlight-red': '#A52A2A', 'cta-bright': '#F44336', 'card-dark': '#2E2E2E' },
 };
+// ---------------------------------------------------
 
 
 const App = () => {
@@ -26,6 +24,7 @@ const App = () => {
     const [cartItems, setCartItems] = useState([]); 
     const [userId, setUserId] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
+    const [session, setSession] = useState(null); 
 
     // --- Supabase Initialization and Auth/User Setup ---
     useEffect(() => {
@@ -37,35 +36,42 @@ const App = () => {
 
         // --- Supabase Auth Listener ---
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            setSession(session); // Update the session state
+            
             if (session?.user) {
-                // User logged in via Supabase Auth
+                // User logged in (Authenticated)
                 setUserId(session.user.id);
+                // After successful login, redirect to home page
+                if (page !== 'home') setPage('home'); 
+                
             } else {
-                // Anonymous persistence using a local UUID
-                setUserId(getLocalUserId());
+                setUserId(null); 
+                setCartItems([]);
+            }
+            setIsAuthReady(true);
+        });
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            if (session?.user) {
+                setUserId(session.user.id);
             }
             setIsAuthReady(true);
         });
 
-        // Immediately set local user ID while Supabase checks for session
-        setUserId(getLocalUserId());
-        
         return () => {
-             // Cleanup Supabase Auth subscription
             if (subscription && subscription.unsubscribe) {
                 subscription.unsubscribe();
             }
         };
-
     }, []);
 
-    // --- Real-time Cart Listener (Supabase Realtime) ---
+    // --- Real-time Cart Listener 
     useEffect(() => {
         let subscription = { unsubscribe: () => {} };
 
-        if (isAuthReady && supabase && userId && userId !== 'Init-Failed') {
+        if (isAuthReady && supabase && userId && userId !== 'Init-Failed' && session?.user) {
             try {
-                // Subscribe to changes in the cart_items table filtered by the current user_id
+               
                 const channel = supabase.channel(`cart_changes_${userId}`);
 
                 channel
@@ -73,7 +79,6 @@ const App = () => {
                         'postgres_changes',
                         { event: '*', schema: 'public', table: 'cart_items', filter: `user_id=eq.${userId}` },
                         () => {
-                            // On any insert, update, or delete matching the user_id, refetch the data
                             fetchCartItems(userId, setCartItems); 
                         }
                     )
@@ -90,17 +95,16 @@ const App = () => {
                 console.error("Error setting up Supabase cart listener:", error);
                 setCartItems([]);
             }
+        } else {
+             setCartItems([]);
         }
 
         return () => subscription.unsubscribe();
-    }, [isAuthReady, userId]); 
+    }, [isAuthReady, userId, session]); 
 
-
-    // --- Cart CRUD Handlers 
     const handleAddToCart = async (dish) => {
-        // Check for client readiness before any DB operation
-        if (!isAuthReady || !supabase || !userId || userId === 'Init-Failed') { 
-            setSuccessMessage({ error: true, message: `Cannot add to cart. Supabase client not ready. Current User ID Status: ${userId}` }); 
+        if (!isAuthReady || !supabase || !userId || !session?.user) { 
+            setSuccessMessage({ error: true, message: "Please log in to add items to your cart." }); 
             return; 
         }
         setIsLoading(true);
@@ -110,7 +114,6 @@ const App = () => {
 
         try {
             if (existingCartItem) {
-                // Update quantity (Supabase .update() call)
                 const { error } = await supabase
                     .from('cart_items')
                     .update({ quantity: existingCartItem.quantity + 1, updated_at: now })
@@ -118,7 +121,6 @@ const App = () => {
 
                 if (error) throw error;
             } else {
-                // Insert new item (Supabase .insert() call)
                 const { error } = await supabase
                     .from('cart_items')
                     .insert({
@@ -142,7 +144,7 @@ const App = () => {
     };
 
     const handleUpdateQuantity = async (itemId, newQuantity) => {
-        if (!isAuthReady || !supabase || !userId) return;
+        if (!isAuthReady || !supabase || !userId || !session?.user) return;
         const now = new Date().toISOString();
 
         if (newQuantity <= 0) {
@@ -164,7 +166,7 @@ const App = () => {
     };
 
     const handleRemoveFromCart = async (itemId) => {
-        if (!isAuthReady || !supabase || !userId) return;
+        if (!isAuthReady || !supabase || !userId || !session?.user) return;
 
         try {
             const { error } = await supabase
@@ -182,8 +184,8 @@ const App = () => {
     // --- Reservation Handler 
     const handleReservationSubmit = async (e) => {
         e.preventDefault();
-        if (!isAuthReady || !supabase || !userId || userId === 'Init-Failed') { 
-            setSuccessMessage({ error: true, message: `Setup required or failed. Current User ID Status: ${userId}` }); 
+        if (!isAuthReady || !supabase || !userId || !session?.user) { 
+            setSuccessMessage({ error: true, message: "Please log in to make a reservation." }); 
             return; 
         }
         setIsLoading(true);
@@ -218,6 +220,9 @@ const App = () => {
     // --- Other Handlers ---
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
     const closeSuccessModal = () => setSuccessMessage(null);
+    
+    // Check if the user is authenticated (has a Supabase session)
+    const isAuthenticated = !!session?.user;
 
     // --- Main Component Render ---
     return (
@@ -230,45 +235,56 @@ const App = () => {
                 .scroll-item { display: inline-block; margin-right: 1rem; }
             `}</style>
 
-            <Header 
-                setPage={setPage}
-                cartItemsCount={cartItems.length}
-                isMenuOpen={isMenuOpen}
-                toggleMenu={toggleMenu}
-            />
+            {/* CONDITIONAL RENDERING: Login or Main App */}
+            {!isAuthReady ? (
+                // Display a loading screen while Supabase is checking the session
+                <div className="min-h-screen flex items-center justify-center text-4xl font-bold text-accent-gold">
+                    <svg className="animate-spin h-8 w-8 mr-3 text-accent-gold" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Loading...
+                </div>
+            ) : isAuthenticated ? (
+                <>
+                    {/* Main Application Layout */}
+                    <Header 
+                        setPage={setPage}
+                        cartItemsCount={cartItems.length}
+                        isMenuOpen={isMenuOpen}
+                        toggleMenu={toggleMenu}
+                    />
 
-            {/* Render the Home Page or the Cart Page */}
-            {page === 'home' ? (
-                <Home 
-                    handleAddToCart={handleAddToCart} 
-                    handleReservationSubmit={handleReservationSubmit} 
-                    isLoading={isLoading}
-                    isAuthReady={isAuthReady}
-                />
+                    {page === 'home' ? (
+                        <Home 
+                            handleAddToCart={handleAddToCart} 
+                            handleReservationSubmit={handleReservationSubmit} 
+                            isLoading={isLoading}
+                            isAuthReady={isAuthReady}
+                        />
+                    ) : (
+                        <Cart 
+                            cartItems={cartItems}
+                            handleUpdateQuantity={handleUpdateQuantity}
+                            handleRemoveItem={handleRemoveFromCart}
+                        />
+                    )}
+
+                    <Footer 
+                        isAuthReady={isAuthReady} 
+                        userId={userId} 
+                        page={page}
+                    />
+                </>
             ) : (
-                <Cart 
-                    cartItems={cartItems}
-                    handleUpdateQuantity={handleUpdateQuantity}
-                    handleRemoveItem={handleRemoveFromCart}
-                />
+                // Render Login page if not authenticated
+                <Login />
             )}
 
-            <Footer 
-                isAuthReady={isAuthReady} 
-                userId={userId} 
-            />
-
-            {/* Success Message Modal (Global UI feedback) */}
+            {/* Success Message Modal */}
             {successMessage && (
                 <div className="fixed inset-0 bg-primary-dark bg-opacity-90 z-[110] flex items-center justify-center p-4" aria-modal="true" role="alert">
                     <div className={`bg-primary-dark border ${successMessage.error ? 'border-highlight-red' : 'border-accent-gold'} rounded-xl shadow-2xl max-w-sm w-full p-8 text-center transition-all duration-300 transform scale-100 opacity-100 text-light-creme`}>
-                        
                         <svg className={`w-16 h-16 mx-auto ${successMessage.error ? 'text-highlight-red' : 'text-accent-gold'} mb-4`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={successMessage.error ? "M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" : "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"}></path></svg>
-                        
                         <h3 className={`text-2xl font-serif font-bold mb-3 ${successMessage.error ? 'text-highlight-red' : 'text-accent-gold'}`}>{successMessage.error ? 'Action Failed' : 'Success!'}</h3>
-                        
                         <p className={`mb-6 ${successMessage.error ? 'text-highlight-red' : 'text-light-creme'}`}>{successMessage.message}</p>
-                        
                         <button onClick={closeSuccessModal} className="bg-accent-gold text-primary-dark px-6 py-2 rounded-full font-semibold hover:bg-highlight-red hover:text-light-creme transition duration-300">Close</button>
                     </div>
                 </div>

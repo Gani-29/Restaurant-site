@@ -1,40 +1,51 @@
 import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid'; 
 
-const SUPABASE_URL = 'https://tgvvuzogikivuaomvklb.supabase.co'; 
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRndnZ1em9naWtpdnVhb212a2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4MjgwNTYsImV4cCI6MjA3OTQwNDA1Nn0.IY89MUzAbriw0s_2fl5-vA4aMnYeVoicQ7pjr6AgneI';
+const supabaseUrl = 'https://tgvvuzogikivuaomvklb.supabase.co'; 
+const supabaseKey = 'sb_publishable_wRBf1fyCMclyh95CUm_dJg__y3ASh6C'; 
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+const LOCAL_USER_ID_KEY = 'restaurant_anon_user_id';
 
 export const getLocalUserId = () => {
-    let id = localStorage.getItem('local_user_id');
-    if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem('local_user_id', id);
+    let id = localStorage.getItem(LOCAL_USER_ID_KEY);
+    if (!id || id === 'Init-Failed') {
+        id = uuidv4();
+        localStorage.setItem(LOCAL_USER_ID_KEY, id);
     }
     return id;
 };
 
+// 2. Fetch Cart Items
 export const fetchCartItems = async (userId, setCartItems) => {
-    if (!supabase || !userId) return;
+    if (!supabase || !userId || userId === 'Init-Failed') {
+        setCartItems([]);
+        return;
+    }
+
     try {
         const { data, error } = await supabase
             .from('cart_items')
             .select('*')
             .eq('user_id', userId)
-            .order('added_at', { ascending: true }); 
+            .order('added_at', { ascending: true });
 
         if (error) throw error;
-        setCartItems(data.map(item => ({
-            id: item.id.toString(), 
-            dishId: item.dish_id, 
+        
+        const formattedItems = data.map(item => ({
+            id: item.id, // Primary key for Supabase operations
+            dishId: item.dish_id, // Menu-level ID
             name: item.name,
             price: item.price,
-            quantity: item.quantity,
             oldPrice: item.old_price,
             discount: item.discount,
-            addedAt: item.added_at,
-        })));
+            quantity: item.quantity,
+        }));
+
+        setCartItems(formattedItems);
     } catch (error) {
-        console.error("Error fetching cart items:", error);
+        console.error("Error fetching cart items:", error.message);
+        setCartItems([]);
     }
 };
