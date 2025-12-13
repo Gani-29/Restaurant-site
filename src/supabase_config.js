@@ -1,51 +1,38 @@
-import { createClient } from '@supabase/supabase-js';
-import { v4 as uuidv4 } from 'uuid'; 
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = 'https://tgvvuzogikivuaomvklb.supabase.co'; 
-const supabaseKey = 'sb_publishable_wRBf1fyCMclyh95CUm_dJg__y3ASh6C'; 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const LOCAL_USER_ID_KEY = 'restaurant_anon_user_id';
+/* ---------- CART HELPERS ---------- */
 
-export const getLocalUserId = () => {
-    let id = localStorage.getItem(LOCAL_USER_ID_KEY);
-    if (!id || id === 'Init-Failed') {
-        id = uuidv4();
-        localStorage.setItem(LOCAL_USER_ID_KEY, id);
-    }
-    return id;
-};
+export async function addToCart({ userId, dish }) {
+  const { error } = await supabase.from("cart_items").insert([
+    {
+      user_id: userId,
+      dish_id: dish.id,
+      name: dish.name,
+      quantity: 1,
+      price: dish.price,
+    },
+  ]);
 
-// 2. Fetch Cart Items
-export const fetchCartItems = async (userId, setCartItems) => {
-    if (!supabase || !userId || userId === 'Init-Failed') {
-        setCartItems([]);
-        return;
-    }
+  if (error) {
+    throw error;
+  }
+}
 
-    try {
-        const { data, error } = await supabase
-            .from('cart_items')
-            .select('*')
-            .eq('user_id', userId)
-            .order('added_at', { ascending: true });
+export async function fetchCartItems(userId) {
+  const { data, error } = await supabase
+    .from("cart_items")
+    .select("*")
+    .eq("user_id", userId);
 
-        if (error) throw error;
-        
-        const formattedItems = data.map(item => ({
-            id: item.id, // Primary key for Supabase operations
-            dishId: item.dish_id, // Menu-level ID
-            name: item.name,
-            price: item.price,
-            oldPrice: item.old_price,
-            discount: item.discount,
-            quantity: item.quantity,
-        }));
+  if (error) {
+    throw error;
+  }
 
-        setCartItems(formattedItems);
-    } catch (error) {
-        console.error("Error fetching cart items:", error.message);
-        setCartItems([]);
-    }
-};
+  return data;
+}
+

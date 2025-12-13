@@ -1,22 +1,20 @@
-import React from 'react';
-import Aboutsection from '../components/Aboutsection.jsx';
-import Menusectton from '../components/Menusection.jsx';
-import Testimonials from '../components/Testimonals.jsx';
-import Contactsection from '../components/Contactsection.jsx';
+import Hero from "../components/Hero";
+import WeekendDeals from "../components/WeekendDeals";
+import MenuSection from "../components/MenuSection";
+import Reservation from "../components/Reservation";
+import Footer from "../components/Footer";
 
-const Home = ({ handleAddToCart, handleReservationSubmit, isLoading, isAuthReady }) => {
-    return (
-        <>
-            <Aboutsection />
-            <Menusectton handleAddToCart={handleAddToCart} />
-            <Contactsection 
-                handleReservationSubmit={handleReservationSubmit} 
-                isLoading={isLoading}
-                isAuthReady={isAuthReady}
-            />
-            <Testimonials />
-        </>
-    );
-};
+export default function Home() {
+  return (
+    <>
+      <Hero />
+      <WeekendDeals />
+      <MenuSection />
+      <Reservation />
 
-export default Home;
+      {/* FOOTER AT BOTTOM */}
+      <Footer />
+    </>
+  );
+}
+
