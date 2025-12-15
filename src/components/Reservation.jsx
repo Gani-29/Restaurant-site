@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../supabase_config";
 
-
 export default function Reservation() {
   const [form, setForm] = useState({
     guests: "",
@@ -18,7 +17,7 @@ export default function Reservation() {
       data: { session },
     } = await supabase.auth.getSession();
 
-    const userId = session?.user?.id || getLocalUserId();
+    const userId = session?.user?.id || "guest-user";
 
     await supabase.from("reservations").insert([
       {
@@ -44,56 +43,78 @@ export default function Reservation() {
 
   return (
     <section
-      id="reservation"   // ✅ THIS IS THE REQUIRED FIX
-      className="py-20 bg-gray-100 flex justify-center"
+      id="reservation"
+      className="min-h-screen flex items-center justify-center bg-cover bg-center relative"
+      style={{
+        backgroundImage:
+          "url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=2070&auto=format&fit=crop')",
+      }}
     >
+      {/* Dark Overlay */}
+      <div className="absolute inset-0 bg-black/60"></div>
+
+      {/* Reservation Card */}
       <form
         onSubmit={handleSubmit}
-        className="bg-white p-8 rounded-xl shadow w-full max-w-xl space-y-4"
+        className="relative bg-white rounded-2xl shadow-xl p-10 w-full max-w-2xl"
       >
-        <h2 className="text-2xl font-bold text-center">Reserve a Table</h2>
+        <h2 className="text-3xl font-bold text-center mb-8 underline decoration-yellow-500">
+          Reserve a Table
+        </h2>
 
-        <input
-          placeholder="No of Guests"
-          value={form.guests}
-          onChange={(e) => setForm({ ...form, guests: e.target.value })}
-          required
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input
+            type="number"
+            placeholder="No of Guests"
+            value={form.guests}
+            onChange={(e) => setForm({ ...form, guests: e.target.value })}
+            className="border rounded-md p-3 w-full focus:outline-none focus:ring-2 focus:ring-red-500"
+            required
+          />
 
-        <input
-          placeholder="Full Name"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
-        />
+          <input
+            placeholder="Full Name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="border rounded-md p-3 w-full focus:outline-none focus:ring-2 focus:ring-red-500"
+            required
+          />
 
-        <input
-          placeholder="Phone"
-          value={form.mobile}
-          onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-          required
-        />
+          <input
+            placeholder="Phone No"
+            value={form.mobile}
+            onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+            className="border rounded-md p-3 w-full focus:outline-none focus:ring-2 focus:ring-red-500"
+            required
+          />
 
-        <input
-          type="date"
-          value={form.date}
-          onChange={(e) => setForm({ ...form, date: e.target.value })}
-          required
-        />
+          <input
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+            className="border rounded-md p-3 w-full focus:outline-none focus:ring-2 focus:ring-red-500"
+            required
+          />
 
-        <input
-          type="time"
-          value={form.time}
-          onChange={(e) => setForm({ ...form, time: e.target.value })}
-          required
-        />
+          <input
+            type="time"
+            value={form.time}
+            onChange={(e) => setForm({ ...form, time: e.target.value })}
+            className="border rounded-md p-3 w-full focus:outline-none focus:ring-2 focus:ring-red-500 md:col-span-2"
+            required
+          />
+        </div>
 
-        <button className="bg-red-500 text-white w-full py-2 rounded">
+        <button
+          type="submit"
+          className="mt-8 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-10 rounded-full mx-auto block transition"
+        >
           Book Now
         </button>
       </form>
     </section>
   );
 }
+
 
 

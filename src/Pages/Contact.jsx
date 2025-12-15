@@ -23,7 +23,7 @@ export default function Contact() {
           <div className="bg-white p-8 rounded-xl shadow">
             <h2 className="text-xl font-semibold mb-4">Get in Touch</h2>
             <p className="text-gray-600 mb-2">📍 Bangalore, India</p>
-            <p className="text-gray-600 mb-2">📞 +91 98765 43210</p>
+            <p className="text-gray-600 mb-2">📞 +91 8639971921</p>
             <p className="text-gray-600 mb-2">✉️ support@pizzahut.com</p>
           </div>
 
